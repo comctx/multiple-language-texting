@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TextBridge v2</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--text:#172033;--muted:#667085;--primary:#2563eb;--line:#d9dee7;--soft:#eef4ff}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--primary);color:#fff;padding:22px 18px 20px}header h1{margin:0;font-size:30px}header p{margin:6px 0 0}
+.wrap{width:min(760px,calc(100% - 24px));margin:18px auto 36px;display:grid;gap:16px}
+.card{background:var(--card);border-radius:16px;padding:18px;box-shadow:0 5px 18px rgba(0,0,0,.08)}
+h2{margin:0 0 12px;font-size:22px}.grid{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:end}
+label{display:block;font-weight:700;font-size:14px}select,textarea{width:100%;font:inherit;border:1px solid var(--line);border-radius:11px;padding:12px;margin-top:6px;background:#fff;color:var(--text)}
+textarea{min-height:115px;resize:vertical}button{font:inherit;font-weight:700;border:0;border-radius:11px;padding:12px 14px;cursor:pointer}
+.primary{background:var(--primary);color:#fff}.secondary{background:#e7ebf1;color:var(--text)}.swap{width:48px;height:48px;padding:0;font-size:22px}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.translated{background:var(--soft);border:1px solid #cfe0ff;border-radius:12px;padding:13px;margin-top:12px;min-height:72px;white-space:pre-wrap;line-height:1.45}
+.status,.small{color:var(--muted);font-size:14px}.history-item{border-top:1px solid var(--line);padding:12px 0}.history-item:first-child{border-top:0}.history-label{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:4px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}.swap{width:100%}.actions button{flex:1 1 46%}}
+</style>
+</head>
+<body>
+<header><h1>TextBridge</h1><p>Write in your language. Send in theirs. Translate replies back.</p></header>
+<div class="wrap">
+<section class="card">
+<h2>Languages</h2>
+<div class="grid">
+<label>I write in<select id="fromLang"></select></label>
+<button id="swapBtn" class="secondary swap" type="button">⇄</button>
+<label>They receive in<select id="toLang"></select></label>
+</div>
+</section>
+
+<section class="card">
+<h2>My Message</h2>
+<textarea id="message" placeholder="Type your message here..."></textarea>
+<div class="actions"><button id="translateBtn" class="primary" type="button">Translate</button><button id="clearBtn" class="secondary" type="button">Clear</button></div>
+<div id="translation" class="translated">Your translation will appear here.</div>
+<div class="actions"><button id="copyBtn" class="secondary" type="button">Copy Translation</button><button id="textBtn" class="primary" type="button">Text This Translation</button></div>
+<div id="status" class="status"></div>
+</section>
+
+<section class="card">
+<h2>Translate Their Reply Back</h2>
+<p class="small">Paste the reply they sent you. TextBridge will translate it back into your language.</p>
+<textarea id="reply" placeholder="Paste their reply here..."></textarea>
+<div class="actions"><button id="replyTranslateBtn" class="primary" type="button">Translate Reply</button><button id="replyClearBtn" class="secondary" type="button">Clear</button></div>
+<div id="replyTranslation" class="translated">Their translated reply will appear here.</div>
+</section>
+
+<section class="card">
+<h2>Recent Translations</h2>
+<div id="history"><p class="small">No translations yet.</p></div>
+<div class="actions"><button id="clearHistoryBtn" class="secondary" type="button">Clear History</button></div>
+</section>
+
+<section class="card"><p class="small">TextBridge uses an online translation service and automatically tries a backup service if the first one is unavailable. Avoid sending highly sensitive information. TextBridge opens your phone's normal Messages app; it does not read incoming texts automatically.</p></section>
+</div>
+
+<script>
+const LANGS=[['en','English'],['es','Spanish'],['fr','French'],['de','German'],['it','Italian'],['pt','Portuguese'],['nl','Dutch'],['pl','Polish'],['ru','Russian'],['uk','Ukrainian'],['ar','Arabic'],['hi','Hindi'],['zh-CN','Chinese (Simplified)'],['ja','Japanese'],['ko','Korean'],['vi','Vietnamese'],['tl','Tagalog']];
+const fromLang=document.getElementById('fromLang'),toLang=document.getElementById('toLang'),message=document.getElementById('message'),translation=document.getElementById('translation'),reply=document.getElementById('reply'),replyTranslation=document.getElementById('replyTranslation'),status=document.getElementById('status'),historyBox=document.getElementById('history');
+
+function fillLanguages(){for(const [code,name] of LANGS){fromLang.add(new Option(name,code));toLang.add(new Option(name,code));}fromLang.value=localStorage.getItem('tb_from')||'en';toLang.value=localStorage.getItem('tb_to')||'es';}
+function saveLanguageChoice(){localStorage.setItem('tb_from',fromLang.value);localStorage.setItem('tb_to',toLang.value);}
+function looksLikeBadTranslation(value){
+  const t=String(value||'').trim().toLowerCase();
+  return !t ||
+    t==='translation test value' ||
+    t==='translated text' ||
+    t==='test value' ||
+    t.includes('translation test');
+}
+
+async function googleTranslate(clean,from,to){
+  const url='https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl='+
+    encodeURIComponent(from)+'&tl='+encodeURIComponent(to)+'&q='+encodeURIComponent(clean);
+
+  const response=await fetch(url);
+  if(!response.ok) throw new Error('Primary translation service failed.');
+
+  const data=await response.json();
+  const translated=Array.isArray(data?.[0])
+    ? data[0].map(part=>part?.[0]||'').join('')
+    : '';
+
+  if(looksLikeBadTranslation(translated)) throw new Error('Primary translation returned an invalid result.');
+  return translated;
+}
+
+async function memoryTranslate(clean,from,to){
+  const url='https://api.mymemory.translated.net/get?q='+
+    encodeURIComponent(clean)+'&langpair='+encodeURIComponent(from+'|'+to);
+
+  const response=await fetch(url);
+  if(!response.ok) throw new Error('Backup translation service failed.');
+
+  const data=await response.json();
+  const translated=data&&data.responseData&&data.responseData.translatedText;
+
+  if(looksLikeBadTranslation(translated)) throw new Error('Backup translation returned an invalid result.');
+  return translated;
+}
+
+async function translateText(text,from,to){
+  const clean=text.trim();
+  if(!clean) throw new Error('Please type a message first.');
+  if(from===to) return clean;
+
+  try{
+    return await googleTranslate(clean,from,to);
+  }catch(primaryError){
+    try{
+      return await memoryTranslate(clean,from,to);
+    }catch(backupError){
+      throw new Error('Translation is temporarily unavailable. Please try again.');
+    }
+  }
+}
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function langName(code){return (LANGS.find(x=>x[0]===code)||[])[1]||code;}
+function addHistory(original,translated,from,to){let history=[];try{history=JSON.parse(localStorage.getItem('tb_history')||'[]');if(!Array.isArray(history))history=[];}catch(e){history=[];}history.unshift({original,translated,from,to,time:new Date().toLocaleString()});history=history.slice(0,20);localStorage.setItem('tb_history',JSON.stringify(history));renderHistory();}
+function renderHistory(){let history=[];try{history=JSON.parse(localStorage.getItem('tb_history')||'[]');if(!Array.isArray(history))history=[];}catch(e){history=[];}if(!history.length){historyBox.innerHTML='<p class="small">No translations yet.</p>';return;}historyBox.innerHTML=history.map(item=>`<div class="history-item"><div class="history-label">${escapeHtml(langName(item.from))} → ${escapeHtml(langName(item.to))} · ${escapeHtml(item.time)}</div><div><b>You:</b> ${escapeHtml(item.original)}</div><div style="margin-top:5px"><b>Translation:</b> ${escapeHtml(item.translated)}</div></div>`).join('');}
+document.getElementById('swapBtn').addEventListener('click',()=>{const temp=fromLang.value;fromLang.value=toLang.value;toLang.value=temp;saveLanguageChoice();});
+fromLang.addEventListener('change',saveLanguageChoice);toLang.addEventListener('change',saveLanguageChoice);
+document.getElementById('translateBtn').addEventListener('click',async()=>{status.textContent='Translating...';try{const result=await translateText(message.value,fromLang.value,toLang.value);translation.textContent=result;status.textContent='Translation ready.';addHistory(message.value.trim(),result,fromLang.value,toLang.value);}catch(err){translation.textContent='Translation failed.';status.textContent=err.message||'Could not translate.';}});
+document.getElementById('replyTranslateBtn').addEventListener('click',async()=>{replyTranslation.textContent='Translating...';try{replyTranslation.textContent=await translateText(reply.value,toLang.value,fromLang.value);}catch(err){replyTranslation.textContent=err.message||'Could not translate reply.';}});
+document.getElementById('copyBtn').addEventListener('click',async()=>{const t=translation.textContent.trim();if(!t||t==='Your translation will appear here.'||t==='Translation failed.'){status.textContent='Translate a message first.';return;}try{await navigator.clipboard.writeText(t);status.textContent='Translation copied.';}catch(e){prompt('Copy this translation:',t);}});
+document.getElementById('textBtn').addEventListener('click',()=>{const t=translation.textContent.trim();if(!t||t==='Your translation will appear here.'||t==='Translation failed.'){status.textContent='Translate a message first.';return;}window.location.href='sms:?&body='+encodeURIComponent(t);});
+document.getElementById('clearBtn').addEventListener('click',()=>{message.value='';translation.textContent='Your translation will appear here.';status.textContent='';});
+document.getElementById('replyClearBtn').addEventListener('click',()=>{reply.value='';replyTranslation.textContent='Their translated reply will appear here.';});
+document.getElementById('clearHistoryBtn').addEventListener('click',()=>{localStorage.removeItem('tb_history');renderHistory();});
+fillLanguages();renderHistory();
+</script>
+</body>
+</html>
