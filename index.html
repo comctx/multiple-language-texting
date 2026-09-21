@@ -345,8 +345,19 @@ const UI_EN=[
   'Paste their reply here...',
   'Translate Reply',
   'Paste From Clipboard',
-  'Messages are translated using online translation services. Avoid sending highly sensitive information. This app does not read incoming text messages automatically.'
+  'Messages are translated using online translation services. Avoid sending highly sensitive information. This app does not read incoming text messages automatically.',
+  'Translating…',
+  'Translation ready. Opening Messages…',
+  'Translation added to conversation.',
+  'Could not translate.',
+  'Reply translated and added to the conversation.',
+  'Could not translate reply.',
+  'Pasted. Tap “Translate Reply.”',
+  'If automatic paste is blocked, press and hold in the box and choose Paste.',
+  'Clear the saved conversation on this device?'
 ];
+
+let CURRENT_UI=UI_EN;
 
 function deviceLanguage(){
   const raw=(navigator.languages&&navigator.languages[0])||navigator.language||'en';
@@ -383,6 +394,7 @@ function refillLanguageOptions(locale){
 }
 
 function setUiStrings(strings,locale){
+  CURRENT_UI=strings;
   const [
     subtitle,languagesTitle,fromLabel,toLabel,conversationTitle,emptyConversation,
     clearConversation,sendTitle,sendNote,messagePlaceholder,sendText,translateOnly,
@@ -535,7 +547,7 @@ function addMessage(side,original,translated,from,to){
 function renderConversation(){
   const data=loadConversation();
   if(!data.length){
-    conversation.innerHTML='<div class="empty" id="emptyConversation">Your translated conversation will appear here.</div>';
+    conversation.innerHTML='<div class="empty" id="emptyConversation">'+escapeHtml(CURRENT_UI[5]||UI_EN[5])+'</div>';
     return;
   }
   conversation.innerHTML=data.map(m=>`
@@ -554,20 +566,20 @@ async function translateMyMessage(openSms){
   const originalLabel=activeButton.textContent;
   sendBtn.disabled=true;
   translateOnlyBtn.disabled=true;
-  activeButton.textContent='Translating…';
-  sendStatus.textContent='Translating…';
+  activeButton.textContent=CURRENT_UI[18]||UI_EN[18];
+  sendStatus.textContent=CURRENT_UI[18]||UI_EN[18];
 
   try{
     const original=message.value.trim();
     const translated=await translateText(original,fromLang.value,toLang.value);
     addMessage('mine',original,translated,fromLang.value,toLang.value);
     message.value='';
-    sendStatus.textContent=openSms?'Translation ready. Opening Messages…':'Translation added to conversation.';
+    sendStatus.textContent=openSms?(CURRENT_UI[19]||UI_EN[19]):(CURRENT_UI[20]||UI_EN[20]);
     if(openSms){
       setTimeout(()=>{window.location.href='sms:?&body='+encodeURIComponent(translated);},150);
     }
   }catch(err){
-    sendStatus.textContent=err.message||'Could not translate.';
+    sendStatus.textContent=(err&&err.message&&err.message!=='Could not translate.')?err.message:(CURRENT_UI[21]||UI_EN[21]);
   }finally{
     sendBtn.disabled=false;
     translateOnlyBtn.disabled=false;
@@ -579,17 +591,17 @@ translateOnlyBtn.addEventListener('click',()=>translateMyMessage(false));
 replyBtn.addEventListener('click',async()=>{
   const originalLabel=replyBtn.textContent;
   replyBtn.disabled=true;
-  replyBtn.textContent='Translating…';
-  replyStatus.textContent='Translating…';
+  replyBtn.textContent=CURRENT_UI[18]||UI_EN[18];
+  replyStatus.textContent=CURRENT_UI[18]||UI_EN[18];
 
   try{
     const original=reply.value.trim();
     const translated=await translateText(original,toLang.value,fromLang.value);
     addMessage('theirs',original,translated,toLang.value,fromLang.value);
     reply.value='';
-    replyStatus.textContent='Reply translated and added to the conversation.';
+    replyStatus.textContent=CURRENT_UI[22]||UI_EN[22];
   }catch(err){
-    replyStatus.textContent=err.message||'Could not translate reply.';
+    replyStatus.textContent=(err&&err.message&&err.message!=='Could not translate reply.')?err.message:(CURRENT_UI[23]||UI_EN[23]);
   }finally{
     replyBtn.disabled=false;
     replyBtn.textContent=originalLabel;
@@ -601,9 +613,9 @@ document.getElementById('pasteBtn').addEventListener('click',async()=>{
     const text=await navigator.clipboard.readText();
     if(!text.trim()) throw new Error('Clipboard is empty.');
     reply.value=text;
-    replyStatus.textContent='Pasted. Tap “Paste Reply & Translate.”';
+    replyStatus.textContent=CURRENT_UI[24]||UI_EN[24];
   }catch(e){
-    replyStatus.textContent='If automatic paste is blocked, press and hold in the box and choose Paste.';
+    replyStatus.textContent=CURRENT_UI[25]||UI_EN[25];
   }
 });
 document.getElementById('swapBtn').addEventListener('click',async()=>{
@@ -624,7 +636,7 @@ toLang.addEventListener('change',()=>{
   updateFlagBadges();
 });
 document.getElementById('clearConversationBtn').addEventListener('click',()=>{
-  if(confirm('Clear the saved conversation on this device?')){
+  if(confirm(CURRENT_UI[26]||UI_EN[26])){
     localStorage.removeItem('mlt_conversation');
     renderConversation();
   }
