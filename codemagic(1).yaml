@@ -1,0 +1,94 @@
+workflows:
+  ios-workflow:
+    name: Multiple Language Texting iOS Build
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    integrations:
+      app_store_connect: Codemagic
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.donaldreckman.multiplelanguagetexting
+      node: latest
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.donaldreckman.multiplelanguagetexting"
+        APP_NAME: "Multiple Language Texting"
+
+    scripts:
+      - name: Create iOS project
+        script: |
+          set -e
+
+          rm -rf www ios node_modules package-lock.json package.json capacitor.config.json
+
+          mkdir -p www
+          cp index.html www/index.html
+
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/ios
+
+          cat > capacitor.config.json <<EOF
+          {
+            "appId": "$BUNDLE_ID",
+            "appName": "$APP_NAME",
+            "webDir": "www"
+          }
+          EOF
+
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Add app icon
+        script: |
+          set -e
+
+          ICON="multiple_language_texting_app_icon_1024.png"
+          APPICON="ios/App/App/Assets.xcassets/AppIcon.appiconset"
+
+          if [ ! -f "$ICON" ]; then
+            echo "Missing app icon: $ICON"
+            exit 1
+          fi
+
+          mkdir -p "$APPICON"
+          cp "$ICON" "$APPICON/AppIcon-1024.png"
+
+          cat > "$APPICON/Contents.json" <<'EOF'
+          {
+            "images": [
+              {
+                "filename": "AppIcon-1024.png",
+                "idiom": "universal",
+                "platform": "ios",
+                "size": "1024x1024"
+              }
+            ],
+            "info": {
+              "author": "xcode",
+              "version": 1
+            }
+          }
+          EOF
+
+      - name: Set up signing
+        script: |
+          xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace ios/App/App.xcworkspace \
+            --scheme App
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
