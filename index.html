@@ -414,8 +414,8 @@ function setUiStrings(strings,locale){
   updateFlagBadges();
 }
 
-async function applyDeviceInterfaceLanguage(){
-  const locale=deviceLanguage();
+async function applyInterfaceLanguage(locale){
+  locale=locale||'en';
 
   if(locale==='en'){
     setUiStrings(UI_EN,'en');
@@ -431,9 +431,7 @@ async function applyDeviceInterfaceLanguage(){
     }
   }catch(e){}
 
-  /* Keep the English interface usable while the one-time UI translation loads. */
-  setUiStrings(UI_EN,'en');
-
+  /* Keep the current interface usable while the one-time UI translation loads. */
   try{
     const divider='\n<<<MLT_UI_DIVIDER>>>\n';
     const translated=await translateText(UI_EN.join(divider),'en',locale);
@@ -444,7 +442,7 @@ async function applyDeviceInterfaceLanguage(){
       setUiStrings(parts,locale);
     }
   }catch(e){
-    /* If localization is unavailable, the app simply remains in English. */
+    /* If localization is unavailable, leave the current interface as-is. */
   }
 }
 
@@ -607,15 +605,23 @@ document.getElementById('pasteBtn').addEventListener('click',async()=>{
     replyStatus.textContent='If automatic paste is blocked, press and hold in the box and choose Paste.';
   }
 });
-document.getElementById('swapBtn').addEventListener('click',()=>{
+document.getElementById('swapBtn').addEventListener('click',async()=>{
   const temp=fromLang.value;
   fromLang.value=toLang.value;
   toLang.value=temp;
   saveLangs();
   updateFlagBadges();
+  await applyInterfaceLanguage(fromLang.value);
 });
-fromLang.addEventListener('change',()=>{saveLangs();updateFlagBadges()});
-toLang.addEventListener('change',()=>{saveLangs();updateFlagBadges()});
+fromLang.addEventListener('change',async()=>{
+  saveLangs();
+  updateFlagBadges();
+  await applyInterfaceLanguage(fromLang.value);
+});
+toLang.addEventListener('change',()=>{
+  saveLangs();
+  updateFlagBadges();
+});
 document.getElementById('clearConversationBtn').addEventListener('click',()=>{
   if(confirm('Clear the saved conversation on this device?')){
     localStorage.removeItem('mlt_conversation');
@@ -625,7 +631,7 @@ document.getElementById('clearConversationBtn').addEventListener('click',()=>{
 
 fillLanguages();
 renderConversation();
-applyDeviceInterfaceLanguage();
+applyInterfaceLanguage(fromLang.value);
 </script>
 </body>
 </html>
