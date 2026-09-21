@@ -180,18 +180,18 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 <header>
   <div class="header-inner">
     <h1>Multiple Language Texting</h1>
-    <p>Translate, text, and keep the whole conversation together.</p>
+    <p id="subtitle">Translate, text, and keep the whole conversation together.</p>
   </div>
 </header>
 
 <div class="wrap">
 
 <section class="card">
-  <div class="card-head"><h2>Languages</h2></div>
+  <div class="card-head"><h2 id="languagesTitle">Languages</h2></div>
   <div class="lang-grid">
     <label>
       <div class="label-row">
-        <span>I write in</span>
+        <span id="fromLabel">I write in</span>
         <span id="fromFlagBadge" class="flag-badge"></span>
       </div>
       <select id="fromLang"></select>
@@ -201,7 +201,7 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 
     <label>
       <div class="label-row">
-        <span>They write in</span>
+        <span id="toLabel">They write in</span>
         <span id="toFlagBadge" class="flag-badge"></span>
       </div>
       <select id="toLang"></select>
@@ -210,9 +210,9 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 </section>
 
 <section class="card">
-  <div class="card-head"><h2>Conversation</h2></div>
+  <div class="card-head"><h2 id="conversationTitle">Conversation</h2></div>
   <div id="conversation" class="conversation">
-    <div class="empty">Your translated conversation will appear here.</div>
+    <div class="empty" id="emptyConversation">Your translated conversation will appear here.</div>
   </div>
   <div class="actions">
     <button id="clearConversationBtn" class="secondary" type="button">Clear Conversation</button>
@@ -220,8 +220,8 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 </section>
 
 <section class="card">
-  <div class="card-head"><h2>Send a Message</h2></div>
-  <p class="section-note">Type in your language. We’ll translate it and open Messages with the translated text ready to send.</p>
+  <div class="card-head"><h2 id="sendTitle">Send a Message</h2></div>
+  <p class="section-note" id="sendNote">Type in your language. We’ll translate it and open Messages with the translated text ready to send.</p>
   <textarea id="message" placeholder="Type your message here..."></textarea>
   <div class="actions">
     <button id="sendBtn" class="primary" type="button">Translate &amp; Text</button>
@@ -231,8 +231,8 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 </section>
 
 <section class="card">
-  <div class="card-head"><h2>Translate Their Reply</h2></div>
-  <p class="section-note">In Messages, copy their reply. Come back here, paste it below, and translate it back into your language.</p>
+  <div class="card-head"><h2 id="replyTitle">Translate Their Reply</h2></div>
+  <p class="section-note" id="replyNote">In Messages, copy their reply. Come back here, paste it below, and translate it back into your language.</p>
   <textarea id="reply" placeholder="Paste their reply here..."></textarea>
   <div class="actions">
     <button id="replyBtn" class="primary" type="button">Translate Reply</button>
@@ -243,7 +243,7 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 
 <section class="card">
   <div class="small">
-    Messages are translated using online translation services. Avoid sending highly sensitive information. This app does not read incoming text messages automatically.
+    <span id="privacyNote">Messages are translated using online translation services. Avoid sending highly sensitive information. This app does not read incoming text messages automatically.</span>
   </div>
 </section>
 
@@ -325,6 +325,129 @@ function flagDataUri(code){
   return 'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
 }
 
+
+const UI_EN=[
+  'Translate, text, and keep the whole conversation together.',
+  'Languages',
+  'I write in',
+  'They write in',
+  'Conversation',
+  'Your translated conversation will appear here.',
+  'Clear Conversation',
+  'Send a Message',
+  'Type in your language. We’ll translate it and open Messages with the translated text ready to send.',
+  'Type your message here...',
+  'Translate & Text',
+  'Translate Only',
+  'Translate Their Reply',
+  'In Messages, copy their reply. Come back here, paste it below, and translate it back into your language.',
+  'Paste their reply here...',
+  'Translate Reply',
+  'Paste From Clipboard',
+  'Messages are translated using online translation services. Avoid sending highly sensitive information. This app does not read incoming text messages automatically.'
+];
+
+function deviceLanguage(){
+  const raw=(navigator.languages&&navigator.languages[0])||navigator.language||'en';
+  const lower=raw.toLowerCase();
+  if(lower.startsWith('zh')) return 'zh-CN';
+  if(lower.startsWith('fil')) return 'tl';
+  if(lower.startsWith('nb')||lower.startsWith('nn')) return 'no';
+  const base=lower.split('-')[0];
+  return LANGS.some(x=>x[0]===base)?base:'en';
+}
+
+function localizeLanguageName(code,locale){
+  try{
+    const display=new Intl.DisplayNames([locale],{type:'language'});
+    const lookup=code==='zh-CN'?'zh-Hans':code;
+    return display.of(lookup)||getLangData(code)[1];
+  }catch(e){
+    return getLangData(code)[1];
+  }
+}
+
+function refillLanguageOptions(locale){
+  const currentFrom=fromLang.value||localStorage.getItem('mlt_from')||'en';
+  const currentTo=toLang.value||localStorage.getItem('mlt_to')||'es';
+  fromLang.innerHTML='';
+  toLang.innerHTML='';
+  for(const [code,name] of LANGS){
+    const shown=localizeLanguageName(code,locale)||name;
+    fromLang.add(new Option(shown,code));
+    toLang.add(new Option(shown,code));
+  }
+  fromLang.value=currentFrom;
+  toLang.value=currentTo;
+}
+
+function setUiStrings(strings,locale){
+  const [
+    subtitle,languagesTitle,fromLabel,toLabel,conversationTitle,emptyConversation,
+    clearConversation,sendTitle,sendNote,messagePlaceholder,sendText,translateOnly,
+    replyTitle,replyNote,replyPlaceholder,translateReply,pasteClipboard,privacyNote
+  ]=strings;
+
+  document.getElementById('subtitle').textContent=subtitle;
+  document.getElementById('languagesTitle').textContent=languagesTitle;
+  document.getElementById('fromLabel').textContent=fromLabel;
+  document.getElementById('toLabel').textContent=toLabel;
+  document.getElementById('conversationTitle').textContent=conversationTitle;
+  const empty=document.getElementById('emptyConversation');
+  if(empty) empty.textContent=emptyConversation;
+  document.getElementById('clearConversationBtn').textContent=clearConversation;
+  document.getElementById('sendTitle').textContent=sendTitle;
+  document.getElementById('sendNote').textContent=sendNote;
+  message.placeholder=messagePlaceholder;
+  sendBtn.textContent=sendText;
+  translateOnlyBtn.textContent=translateOnly;
+  document.getElementById('replyTitle').textContent=replyTitle;
+  document.getElementById('replyNote').textContent=replyNote;
+  reply.placeholder=replyPlaceholder;
+  replyBtn.textContent=translateReply;
+  document.getElementById('pasteBtn').textContent=pasteClipboard;
+  document.getElementById('privacyNote').textContent=privacyNote;
+
+  document.documentElement.lang=locale;
+  document.documentElement.dir=(locale==='ar'||locale==='he')?'rtl':'ltr';
+  refillLanguageOptions(locale);
+  updateFlagBadges();
+}
+
+async function applyDeviceInterfaceLanguage(){
+  const locale=deviceLanguage();
+
+  if(locale==='en'){
+    setUiStrings(UI_EN,'en');
+    return;
+  }
+
+  const cacheKey='mlt_ui_'+locale;
+  try{
+    const cached=JSON.parse(localStorage.getItem(cacheKey)||'null');
+    if(Array.isArray(cached)&&cached.length===UI_EN.length){
+      setUiStrings(cached,locale);
+      return;
+    }
+  }catch(e){}
+
+  /* Keep the English interface usable while the one-time UI translation loads. */
+  setUiStrings(UI_EN,'en');
+
+  try{
+    const divider='\n<<<MLT_UI_DIVIDER>>>\n';
+    const translated=await translateText(UI_EN.join(divider),'en',locale);
+    const parts=translated.split(/<<<MLT_UI_DIVIDER>>>/).map(x=>x.trim());
+
+    if(parts.length===UI_EN.length && parts.every(Boolean)){
+      localStorage.setItem(cacheKey,JSON.stringify(parts));
+      setUiStrings(parts,locale);
+    }
+  }catch(e){
+    /* If localization is unavailable, the app simply remains in English. */
+  }
+}
+
 const fromLang=document.getElementById('fromLang');
 const toLang=document.getElementById('toLang');
 const message=document.getElementById('message');
@@ -345,12 +468,13 @@ function escapeHtml(value){
   return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function fillLanguages(){
+  const preferred=deviceLanguage();
   for(const [code,name] of LANGS){
     fromLang.add(new Option(name,code));
     toLang.add(new Option(name,code));
   }
-  fromLang.value=localStorage.getItem('mlt_from')||'en';
-  toLang.value=localStorage.getItem('mlt_to')||'es';
+  fromLang.value=localStorage.getItem('mlt_from')||preferred||'en';
+  toLang.value=localStorage.getItem('mlt_to')||(preferred==='en'?'es':'en');
   updateFlagBadges();
 }
 function saveLangs(){
@@ -412,7 +536,7 @@ function addMessage(side,original,translated,from,to){
 function renderConversation(){
   const data=loadConversation();
   if(!data.length){
-    conversation.innerHTML='<div class="empty">Your translated conversation will appear here.</div>';
+    conversation.innerHTML='<div class="empty" id="emptyConversation">Your translated conversation will appear here.</div>';
     return;
   }
   conversation.innerHTML=data.map(m=>`
@@ -501,6 +625,7 @@ document.getElementById('clearConversationBtn').addEventListener('click',()=>{
 
 fillLanguages();
 renderConversation();
+applyDeviceInterfaceLanguage();
 </script>
 </body>
 </html>
