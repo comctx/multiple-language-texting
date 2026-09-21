@@ -110,6 +110,7 @@ button{
   transition:transform .05s,background .15s,opacity .15s;
   -webkit-tap-highlight-color:transparent;
 }
+button:disabled{opacity:.58;cursor:default;transform:none}
 button:active{transform:translateY(1px)}
 button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 .primary{background:var(--primary);color:#fff;box-shadow:0 3px 8px rgba(22,122,120,.18)}
@@ -234,7 +235,7 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
   <p class="section-note">In Messages, copy their reply. Come back here, paste it below, and translate it back into your language.</p>
   <textarea id="reply" placeholder="Paste their reply here..."></textarea>
   <div class="actions">
-    <button id="replyBtn" class="primary" type="button">Paste Reply &amp; Translate</button>
+    <button id="replyBtn" class="primary" type="button">Translate Reply</button>
     <button id="pasteBtn" class="secondary" type="button">Paste From Clipboard</button>
   </div>
   <div id="replyStatus" class="status" aria-live="polite"></div>
@@ -242,7 +243,7 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 
 <section class="card">
   <div class="small">
-    This web version can open your phone’s Messages app, but iPhone privacy rules do not allow a web page to read incoming text messages automatically.
+    Messages are translated using online translation services. Avoid sending highly sensitive information. This app does not read incoming text messages automatically.
   </div>
 </section>
 
@@ -333,6 +334,9 @@ const replyStatus=document.getElementById('replyStatus');
 const conversation=document.getElementById('conversation');
 const fromFlagBadge=document.getElementById('fromFlagBadge');
 const toFlagBadge=document.getElementById('toFlagBadge');
+const sendBtn=document.getElementById('sendBtn');
+const translateOnlyBtn=document.getElementById('translateOnlyBtn');
+const replyBtn=document.getElementById('replyBtn');
 
 function getLangData(code){
   return LANGS.find(x=>x[0]===code) || [code,code,'us'];
@@ -423,24 +427,38 @@ function renderConversation(){
   conversation.scrollTop=conversation.scrollHeight;
 }
 async function translateMyMessage(openSms){
-  sendStatus.textContent='Translating...';
+  const activeButton=openSms?sendBtn:translateOnlyBtn;
+  const originalLabel=activeButton.textContent;
+  sendBtn.disabled=true;
+  translateOnlyBtn.disabled=true;
+  activeButton.textContent='Translating…';
+  sendStatus.textContent='Translating…';
+
   try{
     const original=message.value.trim();
     const translated=await translateText(original,fromLang.value,toLang.value);
     addMessage('mine',original,translated,fromLang.value,toLang.value);
     message.value='';
-    sendStatus.textContent=openSms?'Translation ready. Opening Messages...':'Translation added to conversation.';
+    sendStatus.textContent=openSms?'Translation ready. Opening Messages…':'Translation added to conversation.';
     if(openSms){
       setTimeout(()=>{window.location.href='sms:?&body='+encodeURIComponent(translated);},150);
     }
   }catch(err){
     sendStatus.textContent=err.message||'Could not translate.';
+  }finally{
+    sendBtn.disabled=false;
+    translateOnlyBtn.disabled=false;
+    activeButton.textContent=originalLabel;
   }
 }
-document.getElementById('sendBtn').addEventListener('click',()=>translateMyMessage(true));
-document.getElementById('translateOnlyBtn').addEventListener('click',()=>translateMyMessage(false));
-document.getElementById('replyBtn').addEventListener('click',async()=>{
-  replyStatus.textContent='Translating...';
+sendBtn.addEventListener('click',()=>translateMyMessage(true));
+translateOnlyBtn.addEventListener('click',()=>translateMyMessage(false));
+replyBtn.addEventListener('click',async()=>{
+  const originalLabel=replyBtn.textContent;
+  replyBtn.disabled=true;
+  replyBtn.textContent='Translating…';
+  replyStatus.textContent='Translating…';
+
   try{
     const original=reply.value.trim();
     const translated=await translateText(original,toLang.value,fromLang.value);
@@ -449,6 +467,9 @@ document.getElementById('replyBtn').addEventListener('click',async()=>{
     replyStatus.textContent='Reply translated and added to the conversation.';
   }catch(err){
     replyStatus.textContent=err.message||'Could not translate reply.';
+  }finally{
+    replyBtn.disabled=false;
+    replyBtn.textContent=originalLabel;
   }
 });
 document.getElementById('pasteBtn').addEventListener('click',async()=>{
