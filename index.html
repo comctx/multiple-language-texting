@@ -197,6 +197,81 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
   textarea{min-height:120px}
   .conversation{min-height:175px}
 }
+
+/* Build 3 mode chooser */
+.mode-home{
+  width:min(760px,calc(100% - 22px));
+  margin:18px auto 0;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom));
+}
+.mode-intro{
+  background:var(--card);
+  border:1px solid #e1d4c4;
+  border-radius:18px;
+  padding:19px;
+  box-shadow:var(--shadow);
+  margin-bottom:14px;
+}
+.mode-intro h2{font-size:23px;margin-bottom:7px}
+.mode-intro p{margin:0;color:var(--muted);line-height:1.5}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mode-card{
+  width:100%;
+  min-height:210px;
+  text-align:left;
+  background:var(--card);
+  color:var(--text);
+  border:1px solid #dfd2c2;
+  border-radius:18px;
+  padding:20px;
+  box-shadow:var(--shadow);
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:flex-start;
+}
+.mode-card:hover{background:#fff}
+.mode-card .mode-icon{font-size:34px;line-height:1;margin-bottom:14px}
+.mode-card .mode-title{font-size:20px;font-weight:800;color:#145f5d;margin-bottom:7px}
+.mode-card .mode-copy{font-size:14px;font-weight:500;color:var(--muted);line-height:1.45}
+.mode-card .mode-badge{
+  display:inline-block;
+  margin-top:auto;
+  padding-top:14px;
+  font-size:12px;
+  font-weight:800;
+  color:var(--primary-dark);
+}
+.mode-topbar{
+  width:min(760px,calc(100% - 22px));
+  margin:12px auto -4px;
+  display:flex;
+  justify-content:flex-start;
+}
+.mode-back{background:#eadcc9;color:#30413d;min-height:40px;padding:9px 14px}
+.live-placeholder{
+  width:min(760px,calc(100% - 22px));
+  margin:18px auto 0;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom));
+}
+.live-placeholder .card{text-align:center;padding:26px 20px}
+.live-placeholder .big-icon{font-size:44px;margin-bottom:12px}
+.live-placeholder h2{font-size:24px;margin-bottom:9px}
+.live-placeholder p{color:var(--muted);line-height:1.55;margin:0 auto 14px;max-width:560px}
+.live-points{
+  text-align:left;
+  max-width:520px;
+  margin:18px auto 0;
+  padding:0;
+  list-style:none;
+}
+.live-points li{padding:9px 0;border-top:1px solid #ece1d3;line-height:1.4}
+@media(max-width:640px){
+  .mode-home,.live-placeholder,.mode-topbar{width:min(100% - 16px,760px)}
+  .mode-grid{grid-template-columns:1fr}
+  .mode-card{min-height:175px}
+}
+
 </style>
 </head>
 <body>
@@ -208,7 +283,31 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
   </div>
 </header>
 
-<div class="wrap">
+<div id="modeHome" class="mode-home">
+  <section class="mode-intro">
+    <h2>How would you like to communicate?</h2>
+    <p>Choose the way that works best for this conversation.</p>
+  </section>
+  <div class="mode-grid">
+    <button id="openTextMode" class="mode-card" type="button">
+      <span class="mode-icon">💬</span>
+      <span class="mode-title">Translate &amp; Text</span>
+      <span class="mode-copy">Only you need the app. Translate a message, send it through Messages, then paste replies back for translation.</span>
+      <span class="mode-badge">USE CURRENT MODE →</span>
+    </button>
+    <button id="openLiveMode" class="mode-card" type="button">
+      <span class="mode-icon">🌐</span>
+      <span class="mode-title">Live Translation Chat</span>
+      <span class="mode-copy">Both people use Multiple Language Texting. Messages will automatically appear in each person’s preferred language.</span>
+      <span class="mode-badge">AUTOMATIC CHAT — COMING NEXT</span>
+    </button>
+  </div>
+  <div class="brand">A&nbsp;DONCO-BAYCITY™ App</div>
+</div>
+
+<div id="textMode" hidden>
+  <div class="mode-topbar"><button id="backFromText" class="mode-back" type="button">← Choose Mode</button></div>
+  <div class="wrap">
 
 <section class="card">
   <div class="card-head"><h2 id="languagesTitle">Languages</h2></div>
@@ -277,6 +376,24 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 
 <div class="brand">A&nbsp;DONCO-BAYCITY™ App</div>
 
+  </div>
+</div>
+
+<div id="liveMode" hidden>
+  <div class="mode-topbar"><button id="backFromLive" class="mode-back" type="button">← Choose Mode</button></div>
+  <div class="live-placeholder">
+    <section class="card">
+      <div class="big-icon">🌐💬</div>
+      <h2>Live Translation Chat</h2>
+      <p>This is the next major feature. Both people will use Multiple Language Texting, and each message will be translated automatically into the language each person chooses.</p>
+      <ul class="live-points">
+        <li>✓ No copying and pasting replies</li>
+        <li>✓ Automatic two-way translation</li>
+        <li>✓ Each person reads the conversation in their own language</li>
+      </ul>
+    </section>
+    <div class="brand">A&nbsp;DONCO-BAYCITY™ App</div>
+  </div>
 </div>
 
 <script>
@@ -688,6 +805,22 @@ document.getElementById('clearConversationBtn').addEventListener('click',()=>{
     renderConversation();
   }
 });
+
+
+// Build 3 mode chooser. The working translator remains unchanged inside textMode.
+const modeHome=document.getElementById('modeHome');
+const textMode=document.getElementById('textMode');
+const liveMode=document.getElementById('liveMode');
+function showMode(which){
+  modeHome.hidden=which!=='home';
+  textMode.hidden=which!=='text';
+  liveMode.hidden=which!=='live';
+  window.scrollTo({top:0,behavior:'instant'});
+}
+document.getElementById('openTextMode').addEventListener('click',()=>showMode('text'));
+document.getElementById('openLiveMode').addEventListener('click',()=>showMode('live'));
+document.getElementById('backFromText').addEventListener('click',()=>showMode('home'));
+document.getElementById('backFromLive').addEventListener('click',()=>showMode('home'));
 
 fillLanguages();
 renderConversation();
