@@ -128,6 +128,29 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
 
 .actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:11px}
 .actions button{flex:1 1 180px}
+.reply-result{
+  display:none;
+  margin-top:12px;
+  padding:14px;
+  border:1px solid #b8d8d2;
+  border-radius:14px;
+  background:#f4fbf9;
+}
+.reply-result.show{display:block}
+.reply-result .label{
+  font-size:12px;
+  font-weight:800;
+  color:#4b6a64;
+  margin-bottom:5px;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.reply-result .text{
+  font-size:18px;
+  font-weight:750;
+  color:#173b38;
+  line-height:1.4;
+}
 .status{margin-top:9px;color:var(--muted);font-size:13px;min-height:18px;line-height:1.35}
 
 .conversation{
@@ -240,6 +263,10 @@ button:focus-visible{outline:3px solid rgba(22,122,120,.25);outline-offset:2px}
     <button id="pasteBtn" class="secondary" type="button">Paste From Clipboard</button>
   </div>
   <div id="replyStatus" class="status" aria-live="polite"></div>
+  <div id="replyResult" class="reply-result" aria-live="polite">
+    <div class="label">Translated Reply</div>
+    <div id="replyResultText" class="text"></div>
+  </div>
 </section>
 
 <section class="card">
@@ -465,6 +492,8 @@ const message=document.getElementById('message');
 const reply=document.getElementById('reply');
 const sendStatus=document.getElementById('sendStatus');
 const replyStatus=document.getElementById('replyStatus');
+const replyResult=document.getElementById('replyResult');
+const replyResultText=document.getElementById('replyResultText');
 const conversation=document.getElementById('conversation');
 const fromFlagBadge=document.getElementById('fromFlagBadge');
 const toFlagBadge=document.getElementById('toFlagBadge');
@@ -593,15 +622,31 @@ replyBtn.addEventListener('click',async()=>{
   replyBtn.disabled=true;
   replyBtn.textContent=CURRENT_UI[18]||UI_EN[18];
   replyStatus.textContent=CURRENT_UI[18]||UI_EN[18];
+  replyResult.classList.remove('show');
+  replyResultText.textContent='';
 
   try{
     const original=reply.value.trim();
-    const translated=await translateText(original,toLang.value,fromLang.value);
+    if(!original) throw new Error('Please type or paste a reply first.');
+
+    let translated='';
+    try{
+      translated=await googleTranslate(original,'auto',fromLang.value);
+    }catch(primaryError){
+      translated=await memoryTranslate(original,toLang.value,fromLang.value);
+    }
+
+    if(!translated || translated.trim()===original.trim()){
+      // Retry once using the explicitly selected reply language.
+      translated=await translateText(original,toLang.value,fromLang.value);
+    }
+
     addMessage('theirs',original,translated,toLang.value,fromLang.value);
-    reply.value='';
+    replyResultText.textContent=translated;
+    replyResult.classList.add('show');
     replyStatus.textContent=CURRENT_UI[22]||UI_EN[22];
   }catch(err){
-    replyStatus.textContent=(err&&err.message&&err.message!=='Could not translate reply.')?err.message:(CURRENT_UI[23]||UI_EN[23]);
+    replyStatus.textContent=(err&&err.message)?err.message:(CURRENT_UI[23]||UI_EN[23]);
   }finally{
     replyBtn.disabled=false;
     replyBtn.textContent=originalLabel;
@@ -609,6 +654,8 @@ replyBtn.addEventListener('click',async()=>{
 });
 document.getElementById('pasteBtn').addEventListener('click',async()=>{
   replyStatus.textContent='';
+  replyResult.classList.remove('show');
+  replyResultText.textContent='';
   try{
     const text=await navigator.clipboard.readText();
     if(!text.trim()) throw new Error('Clipboard is empty.');
